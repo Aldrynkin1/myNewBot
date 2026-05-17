@@ -7,5 +7,6 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     tg_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True)
+    name: Mapped[str] = mapped_column(String(100), unique=True)
     state: Mapped[str] = mapped_column(String(20), default="idle")  
     # idle / waiting / chatting

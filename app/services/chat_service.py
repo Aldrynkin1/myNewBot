@@ -7,8 +7,8 @@ class ChatService:
         self.user_repo = UserRepository(db)
         self.match_repo = MatchRepository(db)
 
-    async def get_partner_id(self, tg_id: int) -> int | None:
-        user = await self.user_repo.get_or_create(tg_id)
+    async def get_partner_id(self, tg_id: int, usname: str | None, nickname: str) -> int | None:
+        user = await self.user_repo.get_or_create(tg_id, usname, nickname)
         match = await self.match_repo.get_active_match_by_user(user.id)
 
         if not match:
@@ -20,8 +20,8 @@ class ChatService:
 
         return partner.tg_id if partner else None
     
-    async def stop_chat(self, user_tg_id: int) -> None:
-        user = await self.user_repo.get_or_create(user_tg_id)
+    async def stop_chat(self, user_tg_id: int, usname: str | None, nickname:str) -> None:
+        user = await self.user_repo.get_or_create(user_tg_id, usname, nickname)
 
         match = await self.match_repo.get_active_match_by_user(user.id)
         if not match:

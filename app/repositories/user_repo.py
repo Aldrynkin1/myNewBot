@@ -18,7 +18,7 @@ class UserRepository:
         await self.db.refresh(new_user)
         return new_user
     
-    async def get_or_create(self, tg_id: int) -> User:
+    async def get_or_create(self, tg_id: int, username: str | None, nickname: str) -> User:
         query = select(User).where(User.tg_id == tg_id)
         result = await self.db.execute(query)
         user = result.scalar_one_or_none()

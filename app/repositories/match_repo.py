@@ -25,7 +25,7 @@ class MatchRepository:
                 )
         )
         res = await self.db.execute(get_match)
-        return res.scalar_one_or_none()
+        return res.scalars().first()
 
     async def deactivate_match(self, match: Match):
         match.active = False

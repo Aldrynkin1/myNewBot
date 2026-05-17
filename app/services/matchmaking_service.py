@@ -10,8 +10,8 @@ class MatchMakingService:
         self.user_repo = UserRepository(db)
         self.match_repo = MatchRepository(db)
 
-    async def search(self, tg_id: int) -> tuple[User, User] | None:
-        user = await self.user_repo.get_or_create(tg_id)
+    async def search(self, tg_id: int, usname: str | None, nickname: str) -> tuple[User, User] | None:
+        user = await self.user_repo.get_or_create(tg_id, usname, nickname)
         active_match = await self.match_repo.get_active_match_by_user(user.id)
 
         if active_match: return None
