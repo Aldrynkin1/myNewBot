@@ -11,8 +11,8 @@ class UserRepository:
         user = await self.db.execute(get_user)
         return user.scalar_one_or_none()
     
-    async def create_user(self, id: int) -> User:
-        new_user = User(tg_id=id)
+    async def create_user(self, id: int, username: str | None, name: str) -> User:
+        new_user = User(tg_id=id, username=username, name=name or username or f"user_{id}")
         self.db.add(new_user)
         await self.db.commit()
         await self.db.refresh(new_user)
@@ -26,8 +26,16 @@ class UserRepository:
         if user:
             return user
             
-        return await self.create_user(tg_id)
+        return await self.create_user(tg_id, username, nickname)
 
     async def set_state(self, user: User, state: str):
         user.state = state
+        await self.db.commit()
+        
+    async def report_user(self, user: User):
+        user.report_count += 1
+        await self.db.commit()
+
+    async def ban_user(self, user: User):
+        user.banned = True
         await self.db.commit()

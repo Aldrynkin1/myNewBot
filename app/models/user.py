@@ -8,5 +8,8 @@ class User(Base):
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     tg_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True)
     name: Mapped[str] = mapped_column(String(100), unique=True)
+    username: Mapped[str] = mapped_column(String(100))
     state: Mapped[str] = mapped_column(String(20), default="idle")  
     # idle / waiting / chatting
+    report_count: Mapped[int] = mapped_column(default=0)
+    banned: Mapped[bool] = mapped_column(Boolean, default=False)
