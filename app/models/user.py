@@ -1,6 +1,7 @@
 from sqlalchemy import String, Boolean, BigInteger, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column
 from app.core.database import Base
+from sqlalchemy.dialects.postgresql import JSONB
 
 class User(Base):
     __tablename__ = "users"
@@ -13,3 +14,4 @@ class User(Base):
     # idle / waiting / chatting
     report_count: Mapped[int] = mapped_column(default=0)
     banned: Mapped[bool] = mapped_column(Boolean, default=False)
+    admin_notes: Mapped[dict] = mapped_column(JSONB, default={}, server_default='{}')
