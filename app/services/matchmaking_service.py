@@ -26,7 +26,7 @@ class MatchMakingService:
         
         await self.match_repo.create_match(user.id, partner.id)
 
-        await self.user_repo.set_state(user, "chattibg")
-        await self.user_repo.set_state(partner, "chattibg")
+        await self.user_repo.set_state(user, "chatting")
+        await self.user_repo.set_state(partner, "chatting")
         
         return user, partner

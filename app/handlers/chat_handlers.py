@@ -1,17 +1,12 @@
-from email.mime import message
-import os
-
-from aiogram import Router, Bot, F
+from aiogram import Router, Bot
 from aiogram.types import Message
 from aiogram.filters import Command
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.repositories.admin_panel import AdminPanelRepository
 from app.repositories.user_repo import UserRepository
 from app.services.matchmaking_service import MatchMakingService
 from app.services.chat_service import ChatService
 from app.utils.icebreaker import get_random_icebreaker
-from app.services.chat_service import ChatService
 
 router = Router()
 
@@ -20,12 +15,21 @@ router = Router()
 async def start_handler(message: Message, db: AsyncSession):
     if not message.from_user:
         return
-    
+
     user_repo = UserRepository(db)
-    user = await user_repo.get_or_create(message.from_user.id, message.from_user.username, message.from_user.full_name)
+
+    await user_repo.get_or_create(
+        message.from_user.id,
+        message.from_user.username,
+        message.from_user.full_name
+    )
+
     await db.commit()
-    await message.answer("""
-                         Правила общения:
+
+    await message.answer(
+        """
+Правила общения:
+
 1. Уважайте друг друга. Не допускаются оскорбления, унижения, дискриминация по любому признаку.
 
 2. Не публикуйте личную информацию. Не делитесь своими контактами, адресом, местом работы и т.д.
@@ -36,16 +40,16 @@ async def start_handler(message: Message, db: AsyncSession):
 
 5. Если ваш собеседник нарушает правила, используйте команду /report для жалобы.
 
-6. Помните, что за нарушение правил можно получить жалобы от других пользователей, а при 5 и более жалобах - блокировку доступа к боту.
+6. Помните, что за нарушение правил можно получить жалобы от других пользователей, а при 5 и более жалобах — блокировку доступа к боту.
 
 Приятного общения!
 
-/search, чтобы найти собеседника
-
-/next - новый собеседник
-
-/stop - остановить диалог
-                         """)
+/search — найти собеседника
+/next — новый собеседник
+/stop — остановить диалог
+/help — помощь
+"""
+    )
 
 
 @router.message(Command("search"))
@@ -53,8 +57,15 @@ async def search_handler(message: Message, bot: Bot, db: AsyncSession):
     if not message.from_user:
         return
 
-    serv = MatchMakingService(db)
-    res = await serv.search(message.from_user.id, message.from_user.username, message.from_user.full_name)
+    matchmaking = MatchMakingService(db)
+
+    res = await matchmaking.search(
+        message.from_user.id,
+        message.from_user.username,
+        message.from_user.full_name
+    )
+
+    await db.commit()
 
     if not res:
         await message.answer("Ищем собеседника...")
@@ -63,10 +74,19 @@ async def search_handler(message: Message, bot: Bot, db: AsyncSession):
     user, partner = res
 
     await message.answer("Мы нашли тебе пару! Общайся :)")
-    await bot.send_message(partner.tg_id, "Мы нашли тебе пару! Общайся :)")
-    await message.answer("/search, чтобы найти собеседника")
-    await message.answer('/next - новый собеседник')
-    await message.answer('/stop - остановить диалог')
+
+    try:
+        await bot.send_message(
+            partner.tg_id,
+            "🎉 Мы нашли тебе пару! Общайся :)"
+        )
+    except Exception as e:
+        print("Ошибка при отправке сообщения партнеру:", e)
+
+    await message.answer(
+        "/next — новый собеседник\n"
+        "/stop — остановить диалог"
+    )
 
 
 @router.message(Command("next"))
@@ -75,10 +95,37 @@ async def next_handler(message: Message, bot: Bot, db: AsyncSession):
         return
 
     chat_service = ChatService(db)
-    await chat_service.stop_chat(message.from_user.id, message.from_user.username, message.from_user.full_name)
+
+    partner_tg_id = await chat_service.get_partner_id(
+        message.from_user.id,
+        message.from_user.username,
+        message.from_user.full_name
+    )
+
+    if partner_tg_id:
+        try:
+            await bot.send_message(
+                partner_tg_id,
+                "Собеседник переключился на нового пользователя."
+            )
+        except Exception as e:
+            print("Ошибка при уведомлении собеседника:", e)
+
+    await chat_service.stop_chat(
+        message.from_user.id,
+        message.from_user.username,
+        message.from_user.full_name
+    )
 
     matchmaking = MatchMakingService(db)
-    res = await matchmaking.search(message.from_user.id, message.from_user.username, message.from_user.full_name)
+
+    res = await matchmaking.search(
+        message.from_user.id,
+        message.from_user.username,
+        message.from_user.full_name
+    )
+
+    await db.commit()
 
     if not res:
         await message.answer("Ищу нового собеседника...")
@@ -87,10 +134,154 @@ async def next_handler(message: Message, bot: Bot, db: AsyncSession):
     user, partner = res
 
     await message.answer("Новая пара найдена! Общайся :)")
-    await bot.send_message(partner.tg_id, "Новая пара найдена! Общайся :)")
-    await message.answer("/search, чтобы найти собеседника")
-    await message.answer('/next - новый собеседник')
-    await message.answer('/stop - остановить диалог')
+
+    try:
+        await bot.send_message(
+            partner.tg_id,
+            "Новая пара найдена! Общайся :)"
+        )
+    except Exception as e:
+        print("Ошибка при отправке сообщения партнеру:", e)
+
+    await message.answer(
+        "/next — новый собеседник\n"
+        "/stop — остановить диалог"
+    )
+
+
+@router.message(Command("stop"))
+async def stop_handler(message: Message, bot: Bot, db: AsyncSession):
+    if not message.from_user:
+        return
+
+    chat_service = ChatService(db)
+
+    partner_tg_id = await chat_service.get_partner_id(
+        message.from_user.id,
+        message.from_user.username,
+        message.from_user.full_name
+    )
+
+    if not partner_tg_id:
+        await message.answer(
+            "Ты сейчас ни с кем не общаешься.\n"
+            "Напиши /search, чтобы найти собеседника"
+        )
+        return
+
+    await chat_service.stop_chat(
+        message.from_user.id,
+        message.from_user.username,
+        message.from_user.full_name
+    )
+
+    await db.commit()
+
+    await message.answer(
+        "Диалог остановлен.\n"
+        "Чтобы найти нового собеседника, введи /search"
+    )
+
+    try:
+        await bot.send_message(
+            partner_tg_id,
+            "Собеседник завершил диалог.\n"
+            "Чтобы найти нового, введи /search"
+        )
+    except Exception as e:
+        print("Ошибка на стороне сервера:", e)
+
+
+@router.message(Command("help"))
+async def help_handler(message: Message):
+    help_text = (
+        "Вот что я могу сделать:\n\n"
+        "/search — найти собеседника\n"
+        "/next — найти нового собеседника\n"
+        "/stop — остановить диалог\n"
+        "/report — пожаловаться на собеседника\n"
+        "/icebreaker — случайный вопрос для диалога\n"
+        "/help — показать это сообщение"
+    )
+
+    await message.answer(help_text)
+
+
+@router.message(Command("icebreaker"))
+async def icebreaker_handler(message: Message, db: AsyncSession, bot: Bot):
+    if not message.from_user:
+        return
+
+    chat_service = ChatService(db)
+
+    partner_tg_id = await chat_service.get_partner_id(
+        message.from_user.id,
+        message.from_user.username,
+        message.from_user.full_name
+    )
+
+    if not partner_tg_id:
+        await message.answer(
+            "Ты сейчас ни с кем не общаешься.\n"
+            "Напиши /search"
+        )
+        return
+
+    icebreaker = get_random_icebreaker()
+
+    await message.answer(
+        f"Вопрос для поддержания разговора:\n\n{icebreaker}"
+    )
+
+    try:
+        await bot.send_message(
+            partner_tg_id,
+            f"🎲 Собеседник запустил игру!\n\n{icebreaker}"
+        )
+    except Exception as e:
+        print("Ошибка при отправке вопроса:", e)
+
+
+@router.message(Command("report"))
+async def report_handler(message: Message, db: AsyncSession, bot: Bot):
+    if not message.from_user:
+        return
+
+    chat_service = ChatService(db)
+
+    partner_tg_id = await chat_service.get_partner_id(
+        message.from_user.id,
+        message.from_user.username,
+        message.from_user.full_name
+    )
+
+    if not partner_tg_id:
+        await message.answer(
+            "Ты сейчас ни с кем не общаешься.\n"
+            "Напиши /search"
+        )
+        return
+
+    await chat_service.report_partner(
+        message.from_user.id,
+        message.from_user.username,
+        message.from_user.full_name
+    )
+
+    await db.commit()
+
+    await message.answer(
+        "Собеседник был отмечен за нарушение правил."
+    )
+
+    try:
+        await bot.send_message(
+            partner_tg_id,
+            "На тебя поступила жалоба.\n"
+            "Пожалуйста, соблюдай правила общения."
+        )
+    except Exception as e:
+        print("Ошибка при отправке предупреждения:", e)
 
 
 @router.message()
@@ -102,108 +293,43 @@ async def forward_handler(message: Message, bot: Bot, db: AsyncSession):
         return
 
     service = ChatService(db)
+
     partner_tg_id = await service.get_partner_id(
-        message.from_user.id, message.from_user.username, message.from_user.full_name
+        message.from_user.id,
+        message.from_user.username,
+        message.from_user.full_name
     )
 
     if not partner_tg_id:
-        await message.answer("Ты сейчас ни с кем не общаешься. Напиши /search")
+        await message.answer(
+            "Ты сейчас ни с кем не общаешься.\n"
+            "Напиши /search"
+        )
         return
 
-    action = "upload_document" if message.document else "typing"
-    if message.photo or message.video:
-        action = "upload_photo" if message.photo else "upload_video"
+    action = "typing"
+
+    if message.photo:
+        action = "upload_photo"
+    elif message.video:
+        action = "upload_video"
+    elif message.document:
+        action = "upload_document"
+    elif message.voice:
+        action = "upload_voice"
 
     try:
-        await bot.send_chat_action(chat_id=partner_tg_id, action=action)
-    except Exception as e:
-        print('Ошибка на стороне сервера при отправке действия - ', e)
-        pass 
-
-    await message.send_copy(chat_id=partner_tg_id)
-
-    
-    
-@router.message(Command("stop"))
-async def stop_handler(message: Message, bot: Bot, db: AsyncSession):
-    if not message.from_user:
-        return
-    
-    chat_service = ChatService(db)
-    partner_tg_id = await chat_service.get_partner_id(message.from_user.id, message.from_user.username, message.from_user.full_name)
-
-    if not partner_tg_id:
-        await message.answer("Ты сейчас ни с кем не общаешься. Напиши /search, чтобы найти собеседника")
-        return
-
-    await chat_service.stop_chat(message.from_user.id, message.from_user.username, message.from_user.full_name)
-    await message.answer("Диалог остановлен. Чтобы найти нового собеседника, введи /search")
-    try:
-        await bot.send_message(
-            partner_tg_id, 
-            "Собеседник завершил диалог. Чтобы найти нового, введи /search"
+        await bot.send_chat_action(
+            chat_id=partner_tg_id,
+            action=action
         )
     except Exception as e:
-        print('Ошибка на стороне сервера - ', e)
-        pass
-    
-@router.message(Command("help"))
-async def help_handler(message: Message, db: AsyncSession):
-    if not message.from_user:
-        return
-    
-    help_text = (
-        "Вот что я могу сделать:\n\n"
-        "/search — найти собеседника\n"
-        "/next — найти нового собеседника\n"
-        "/stop — остановить диалог\n"
-        "/report — пожаловаться на собеседника\n"
-        "/icebreaker — случайный вопрос для диалога\n"
-        "/help — показать это сообщение"
-    )
-    
-    await message.answer(help_text, parse_mode="Markdown")
+        print("Ошибка при отправке действия:", e)
 
-    
-@router.message(Command("icebreaker"))
-async def icebreaker_handler(message: Message, db: AsyncSession, bot: Bot):
-    if not message.from_user:
-        return
-    
-    chat_service = ChatService(db)
-    partner_tg_id = await chat_service.get_partner_id(message.from_user.id, message.from_user.username, message.from_user.full_name)
-
-    if not partner_tg_id:
-        await message.answer("Ты сейчас ни с кем не общаешься. Напиши /search, чтобы найти собеседника")
-        return
-    
-    icebreaker = get_random_icebreaker()
-    await message.answer(f"Вот вопрос для поддержания разговора:\n\n{icebreaker}")
     try:
-        await bot.send_message(partner_tg_id, f"🎲 Собеседник запустил игру! Вопрос для вас обоих:\n\n{icebreaker}")
+        await message.send_copy(chat_id=partner_tg_id)
     except Exception as e:
-        print('Ошибка на стороне сервера при отправке вопроса - ', e)
-        pass
-    
-@router.message(Command("report"))
-async def report_handler(message: Message, db: AsyncSession, bot: Bot):
-    if not message.from_user:
-        return
-
-    chat_service = ChatService(db)
-    partner_tg_id = await chat_service.get_partner_id(message.from_user.id, message.from_user.username, message.from_user.full_name)
-
-    if not partner_tg_id:
-        await message.answer("Ты сейчас ни с кем не общаешься. Напиши /search, чтобы найти собеседника")
-        return
-
-    await chat_service.report_partner(message.from_user.id, message.from_user.username, message.from_user.full_name)
-    await message.answer("Собеседник был отмечен за нарушение правил.")
-    
-    if partner_tg_id:
-        try:
-            await bot.send_message(partner_tg_id, "⚠️ Твой собеседник пожаловался на тебя. Пожалуйста, соблюдай правила общения. Если ты получишь 5 жалоб, то будешь заблокирован.")
-        except Exception as e:
-            print('Ошибка на стороне сервера при отправке предупреждения - ', e)
-            pass
-        
+        print("Ошибка при пересылке сообщения:", e)
+        await message.answer(
+            "Не удалось отправить сообщение собеседнику."
+        )

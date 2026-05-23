@@ -80,8 +80,12 @@ class AdminPanelRepository:
         banned_users = await self.db.execute(select(func.count(User.id)).where(User.banned.is_(True)))
         banned_users = banned_users.scalar()
         
+        total_matches = await self.db.execute(select(func.count(Match.id)))
+        total_matches = total_matches.scalar()
+        
         return {
             "total_users": total_users,
+            "total_matches": total_matches,
             "active_matches": active_matches,
             "banned_users": banned_users
         }
@@ -114,7 +118,7 @@ class AdminPanelRepository:
             return f'user with tg_id {tg_id} not found'
         
         await self.db.execute(
-            delete(Match).where((Match.user_id == user.id) | (Match.partner_id == user.id))
+            delete(Match).where((Match.user1_id == user.id) | (Match.user2_id == user.id))
         )
         await self.db.delete(user)
         await self.db.commit()
