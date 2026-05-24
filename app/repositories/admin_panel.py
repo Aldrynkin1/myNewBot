@@ -96,22 +96,20 @@ class AdminPanelRepository:
     
     async def ban_user_by_tg_id(self, tg_id: int):
         user = await self.get_user_by_tg_id(tg_id)
-        if user:
-            user.banned = True
-            await self.db.commit()
-            
         if not user:
             return f'user with tg_id {tg_id} not found'
+        
+        user.banned = True
+        return user
         
     async def unban_user_by_tg_id(self, tg_id: int):
         user = await self.get_user_by_tg_id(tg_id)
-        if user:
-            user.banned = False
-            await self.db.commit()
-            
         if not user:
             return f'user with tg_id {tg_id} not found'
-        
+            
+        user.banned = False
+        return user
+    
     async def delete_user_by_tg_id(self, tg_id: int):
         user = await self.get_user_by_tg_id(tg_id)
         if not user:
@@ -123,3 +121,34 @@ class AdminPanelRepository:
         await self.db.delete(user)
         await self.db.commit()
         return f'user with tg_id {tg_id} deleted successfully'
+    
+    async def add_new_admin(self, tg_id: int) -> User | str:
+        
+        user = await self.user_repo.get_user_by_id(tg_id) 
+        
+        if not user:
+            return f"Пользователь с TG ID {tg_id} еще не запускал бота."
+            
+        user.is_admin = True
+        return user
+
+    
+    async def delete_admin(self, tg_id: int) -> str:
+        user = await self.get_user_by_tg_id(tg_id)
+        if not user:
+            return f'user with tg_id {tg_id} not found'
+        user.is_admin = False
+        await self.db.commit()
+        return f'user with tg_id {tg_id} removed from admins successfully'
+    
+    async def get_all_admins(self) -> list[User]:
+        result = await self.db.execute(self.db.query(User).filter(User.is_admin.is_(True)))
+        return result.scalars().all()
+    
+    async def get_all_banned_users(self) -> list[User]:
+        result = await self.db.execute(self.db.query(User).filter(User.banned.is_(True)))
+        return result.scalars().all()
+    
+    async def get_all_active_matches(self) -> list[Match]:
+        result = await self.db.execute(self.db.query(Match).filter(Match.active.is_(True)))
+        return result.scalars().all()

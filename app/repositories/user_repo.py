@@ -1,6 +1,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models.user import User
+from typing import List
 
 class UserRepository:
     def __init__(self, db: AsyncSession):
@@ -39,3 +40,9 @@ class UserRepository:
     async def ban_user(self, user: User):
         user.banned = True
         await self.db.commit()
+        
+    async def get_all_users(self) -> list[int]:
+        query = select(User.tg_id).where(User.banned == False)
+        res = await self.db.execute(query)
+
+        return list(res.scalars().all())

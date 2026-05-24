@@ -15,3 +15,4 @@ class User(Base):
     report_count: Mapped[int] = mapped_column(default=0)
     banned: Mapped[bool] = mapped_column(Boolean, default=False)
     admin_notes: Mapped[dict] = mapped_column(JSONB, default={}, server_default='{}')
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
