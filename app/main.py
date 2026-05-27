@@ -35,8 +35,9 @@ async def main():
     
     bot = Bot(token=settings.bot_token)
     dp = Dispatcher()
-
-    dp.startup.register(on_startup_notify)
+    a = input("Введите 'да', чтобы начать рассылку или нажмите Enter, чтобы пропустить: ").strip().lower()
+    if a == 'да':
+        dp.startup.register(on_startup_notify)
 
     dp.update.middleware(DbSessionMiddleware())
 
