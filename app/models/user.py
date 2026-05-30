@@ -1,4 +1,4 @@
-from sqlalchemy import String, Boolean, BigInteger, ForeignKey
+from sqlalchemy import String, Boolean, BigInteger
 from sqlalchemy.orm import Mapped, mapped_column
 from app.core.database import Base
 from sqlalchemy.dialects.postgresql import JSONB

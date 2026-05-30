@@ -44,7 +44,6 @@ def main():
     dp.update.middleware(DbSessionMiddleware())
     dp.include_router(router)
 
-    # Проверяем: если мы на сервере Render (переменная создана хостингом автоматически)
     if os.getenv("RENDER_EXTERNAL_URL"):
         dp.startup.register(on_startup_webhook)
         

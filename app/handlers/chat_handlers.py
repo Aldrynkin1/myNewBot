@@ -7,8 +7,10 @@ from app.repositories.user_repo import UserRepository
 from app.services.matchmaking_service import MatchMakingService
 from app.services.chat_service import ChatService
 from app.utils.icebreaker import get_random_icebreaker
+from app.utils.count.count import count_game #type: ignore
 
 router = Router()
+
 
 
 @router.message(Command("start"))
@@ -283,6 +285,87 @@ async def report_handler(message: Message, db: AsyncSession, bot: Bot):
     except Exception as e:
         print("Ошибка при отправке предупреждения:", e)
 
+@router.message(Command("count"))
+async def count_handler(message: Message, db: AsyncSession, bot: Bot):
+    if not message.from_user:
+        return
+
+    chat_service = ChatService(db)
+
+    partner_tg_id = await chat_service.get_partner_id(
+        message.from_user.id,
+        message.from_user.username,
+        message.from_user.full_name,
+    )
+
+    if not partner_tg_id:
+        await message.answer(
+            "Ты сейчас ни с кем не общаешься.\n" "Напиши /search"
+        )
+        return
+
+    if not message.text:
+        return
+
+    args = message.text.split()
+    if len(args) < 3:
+        await message.answer(
+            "Неверный формат команды.\n"
+            "Используй: `/count [твой_ответ] [ответ_партнёра]`\n"
+            "Пример: `/count 45 50` (если неправильно вписан ответ собеседника с твоей стороны - карается репортом от партнёра, так что будь внимателен!)"
+        )
+        return
+
+    try:
+        user1_ans = int(args[1])
+        user2_ans = int(args[2])
+    except ValueError:
+        await message.answer(
+            "Ответы должны быть целыми числами.\n" "Пример: `/count 45 50`"
+        )
+        return
+
+    result = count_game(
+        user1_id=message.from_user.id,
+        user1_ans=user1_ans,
+        user2_id=partner_tg_id,
+        user2_ans=user2_ans,
+    )
+
+    response_text = (
+        f"Игра завершена!**\n\n"
+        f"Пример: `{result['expression']}`\n"
+        f"Правильный ответ: `{result['correct_answer']:.2f}`\n\n"
+    )
+
+    if result["winner_id"] == 0:
+        response_text += "Ничья! У обоих одинаковое отклонение от истины."
+    elif result["winner_id"] == message.from_user.id:
+        response_text += "Вы победили!** Ваша точность оказалась выше."
+    else:
+        response_text += "Победил ваш партнёр!** Его ответ был ближе."
+
+    await message.answer(response_text, parse_mode="Markdown")
+
+    partner_text = (
+        f"Ваш партнёр завершил игру!**\n\n"
+        f"Выражение: `{result['expression']}`\n"
+        f"Истинный ответ: `{result['correct_answer']:.2f}`\n\n"
+    )
+
+    if result["winner_id"] == 0:
+        partner_text += "Ничья! У обоих одинаковое отклонение от истины."
+    elif result["winner_id"] == partner_tg_id:
+        partner_text += "Вы победили!** Ваш ответ оказался ближе."
+    else:
+        partner_text += "Победил ваш партнёр!** Его точность выше."
+
+    try:
+        await bot.send_message(
+            chat_id=partner_tg_id, text=partner_text, parse_mode="Markdown"
+        )
+    except Exception:
+        pass
 
 @router.message()
 async def forward_handler(message: Message, bot: Bot, db: AsyncSession):
