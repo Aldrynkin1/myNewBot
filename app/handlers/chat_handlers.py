@@ -1,4 +1,5 @@
-from aiogram import Router, Bot
+import asyncio
+from aiogram import Router, Bot, types, F
 from aiogram.types import Message
 from aiogram.filters import Command
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,10 +8,10 @@ from app.repositories.user_repo import UserRepository
 from app.services.matchmaking_service import MatchMakingService
 from app.services.chat_service import ChatService
 from app.utils.icebreaker import get_random_icebreaker
-from ..utils.count.count import count_game 
+from ..utils.count.count import check_winner, generate_question
 
 router = Router()
-
+active_math_games = {} 
 
 
 @router.message(Command("start"))
@@ -203,6 +204,7 @@ async def help_handler(message: Message):
         "/stop — остановить диалог\n"
         "/report — пожаловаться на собеседника\n"
         "/icebreaker — случайный вопрос для диалога\n"
+        "/count - сыграть с партнером в интеллектуальную игру\n"
         "/help — показать это сообщение"
     )
 
@@ -286,9 +288,11 @@ async def report_handler(message: Message, db: AsyncSession, bot: Bot):
         print("Ошибка при отправке предупреждения:", e)
 
 @router.message(Command("count"))
-async def count_handler(message: Message, db: AsyncSession, bot: Bot):
+async def count_handler(message: types.Message, db: AsyncSession, bot: Bot):
     if not message.from_user:
         return
+
+    user_id = message.from_user.id
 
     chat_service = ChatService(db)
 
@@ -304,78 +308,92 @@ async def count_handler(message: Message, db: AsyncSession, bot: Bot):
         )
         return
 
-    if not message.text:
-        return
+    question = generate_question()
 
-    args = message.text.split()
-    if len(args) < 3:
-        await message.answer(
-            "Неверный формат команды.\n"
-            "Используй: `/count [твой_ответ] [ответ_партнёра]`\n"
-            "Пример: `/count 45 50` (если неправильно вписан ответ собеседника с твоей стороны - карается репортом от партнёра, так что будь внимателен!)"
-        )
-        return
+    correct_res = question["Правильный ответ: "]
 
-    try:
-        user1_ans = int(args[1])
-        user2_ans = int(args[2])
-    except ValueError:
-        await message.answer(
-            "Ответы должны быть целыми числами.\n" "Пример: `/count 45 50`"
-        )
-        return
+    game_data = {
+        "partner_id": partner_tg_id,
+        "correct_res": correct_res,
+        "answers": {user_id: None, partner_tg_id: None} 
+    }
+    active_math_games[user_id] = game_data
+    active_math_games[partner_tg_id] = game_data
 
-    result = count_game(
-        user1_id=message.from_user.id,
-        user1_ans=user1_ans,
-        user2_id=partner_tg_id,
-        user2_ans=user2_ans,
+    await message.answer(
+    f'10 секунд! Реши пример:\n\n{question["Пример: "]} = ?'
+)
+
+    await bot.send_message(
+        partner_tg_id,
+        f'10 секунд! Реши пример:\n\n{question["Пример: "]} = ?'
     )
 
-    response_text = (
-        f"Игра завершена!**\n\n"
-        f"Пример: `{result['expression']}`\n"
-        f"Правильный ответ: `{result['correct_answer']:.2f}`\n\n"
+    await asyncio.sleep(10.0)
+
+    active_math_games.pop(user_id, None)
+    active_math_games.pop(partner_tg_id, None)
+
+    u1_ans = game_data["answers"][user_id]
+    u2_ans = game_data["answers"][partner_tg_id]
+
+    final_ans_u1 = u1_ans if u1_ans is not None else -99999
+    final_ans_u2 = u2_ans if u2_ans is not None else -99999
+
+    winner_data = check_winner(
+        correct_res,
+        message.from_user.id,
+        final_ans_u1,
+        partner_tg_id,
+        final_ans_u2
     )
 
-    if result["winner_id"] == 0:
-        response_text += "Ничья! У обоих одинаковое отклонение от истины."
-    elif result["winner_id"] == message.from_user.id:
-        response_text += "Вы победили!** Ваша точность оказалась выше."
+    winner_id = winner_data["Победитель: "]
+
+    result_for_owner = f'Правильный ответ: {correct_res}\n\n' \
+                f'Твой ответ: {final_ans_u1}\n' \
+                f'Ответ собеседника: {final_ans_u2}\n\n'
+    
+    if winner_id == 0:
+        result_for_owner += "Ничья!"
+    elif winner_id == user_id:
+        result_for_owner += "Ты победил!"
     else:
-        response_text += "Победил ваш партнёр!** Его ответ был ближе."
+        result_for_owner += "Победил собеседник!"
 
-    await message.answer(response_text, parse_mode="Markdown")
+    await message.answer(result_for_owner, parse_mode="Markdown")
 
-    partner_text = (
-        f"Ваш партнёр завершил игру!**\n\n"
-        f"Выражение: `{result['expression']}`\n"
-        f"Истинный ответ: `{result['correct_answer']:.2f}`\n\n"
-    )
+    result_for_partner = f'Правильный ответ: {correct_res}\n\n' \
+                f'Твой ответ: {final_ans_u2}\n' \
+                f'Ответ собеседника: {final_ans_u1}\n\n'
 
-    if result["winner_id"] == 0:
-        partner_text += "Ничья! У обоих одинаковое отклонение от истины."
-    elif result["winner_id"] == partner_tg_id:
-        partner_text += "Вы победили!** Ваш ответ оказался ближе."
+    if winner_id == 0:
+        result_for_partner += "Ничья!"
+    elif winner_id == partner_tg_id:
+        result_for_partner += "Ты победил!"
     else:
-        partner_text += "Победил ваш партнёр!** Его точность выше."
+        result_for_partner += "Победил собеседник!"
+    await bot.send_message(partner_tg_id, result_for_partner, parse_mode="Markdown")
 
-    try:
-        await bot.send_message(
-            chat_id=partner_tg_id, text=partner_text, parse_mode="Markdown"
-        )
-    except Exception:
-        pass
-
-@router.message()
+@router.message(F.text, ~F.text.startswith("/"))
 async def forward_handler(message: Message, bot: Bot, db: AsyncSession):
     if not message.from_user:
         return
 
-    if message.text and message.text.startswith("/"):
+    if (message.text or not message.text.isdigit()) and message.text.startswith("/"):
         return
 
     service = ChatService(db)
+
+    user_id = message.from_user.id
+
+    if user_id in active_math_games:
+        text = message.text.strip()
+
+        if (text.isdigit() or (text.startswith("-") and text[1:].isdigit())) and active_math_games[user_id]["answers"][user_id] is None:
+            active_math_games[user_id]["answers"][user_id] = int(text)
+            await message.answer('Ответ принят!')
+            return
 
     partner_tg_id = await service.get_partner_id(
         message.from_user.id,

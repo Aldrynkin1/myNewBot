@@ -3,20 +3,20 @@ from libc.stdlib cimport abs
 from libc.math cimport fabs
 
 cdef class User:
-    cdef public str name
+    cdef public long long tg_id
     cdef public int answer
 
-    def __init__(self, str name, int answer):
-        self.name = name
+    def __init__(self, long long tg_id, int answer):
+        self.tg_id = tg_id
         self.answer = answer
 
 
 cdef double count_res(int a, int b, char symbol):
-    if symbol == b'+':
+    if symbol == b'+'[0]:
         return a + b
-    elif symbol == b'-':
+    elif symbol == b'-'[0]:
         return a - b
-    elif symbol == b'*':
+    elif symbol == b'*'[0]:
         return a * b
     else:
         return (<double>a / b) if b != 0 else 0.0
@@ -32,21 +32,26 @@ cdef int winner(double correct_res, User u1, User u2):
     else:
         return 0
 
-def count_game(int user1_name, int user1_ans, int user2_name, int user2_ans):
+
+def generate_question():
     cdef int first_num = random.randint(1, 10000)
     cdef int second_num = random.randint(1, 10000)
-    cdef list symbols = [b'+', b'-', b'/', b'*']
-    cdef char chosen_symbol = random.choice(symbols)
+    symbols = [b'+', b'-', b'/', b'*']
+    cdef bytes chosen_symbol = random.choice(symbols)
 
-    cdef double correct_res = count_res(first_num, second_num, chosen_symbol)
-
-    cdef User u1 = User(name=user1_name, answer=user1_ans)
-    cdef User u2 = User(name=user2_name, answer=user2_ans)
-
-    cdef winner_id = winner(correct_res, u1, u2)
+    cdef double correct_res = count_res(first_num, second_num, chosen_symbol[0])
 
     return {
         "Пример: ": f'{first_num} {chosen_symbol.decode()} {second_num}',
         "Правильный ответ: ": correct_res,
-        "Победитель: ": winner_id,
+    }
+
+def check_winner(double correct_res, long long user1_tg_id, int user1_ans, long long user2_tg_id, int user2_ans):
+    cdef User u1 = User(tg_id=user1_tg_id, answer=user1_ans)
+    cdef User u2 = User(tg_id=user2_tg_id, answer=user2_ans)
+
+    cdef winner_id = winner(correct_res, u1, u2)
+
+    return {
+        "Победитель: ": winner_id
     }
