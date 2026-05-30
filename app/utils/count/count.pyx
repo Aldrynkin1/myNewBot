@@ -1,5 +1,6 @@
 import random
 from libc.stdlib cimport abs
+from libc.math cimport fabs
 
 cdef class User:
     cdef public str name
@@ -21,8 +22,8 @@ cdef double count_res(int a, int b, char symbol):
         return (<double>a / b) if b != 0 else 0.0
 
 cdef int winner(double correct_res, User u1, User u2):
-    cdef double answer1 = abs(correct_res - u1.answer)
-    cdef double answer2 = abs(correct_res - u2.answer)
+    cdef double answer1 = fabs(correct_res - u1.answer)
+    cdef double answer2 = fabs(correct_res - u2.answer)
 
     if answer1 < answer2:
         return u1.tg_id

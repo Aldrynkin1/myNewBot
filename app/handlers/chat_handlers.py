@@ -7,7 +7,7 @@ from app.repositories.user_repo import UserRepository
 from app.services.matchmaking_service import MatchMakingService
 from app.services.chat_service import ChatService
 from app.utils.icebreaker import get_random_icebreaker
-from app.utils.count.count import count_game #type: ignore
+from ..utils.count.count import count_game 
 
 router = Router()
 

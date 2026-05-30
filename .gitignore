@@ -16,6 +16,9 @@ __pycache__/
 .pytest_cache/
 alembic/__pycache__/
 
+count.c
+build
+app/utils/count/count.cpython-312-x86_64-linux-gnu.so
 node_modules/
 npm-debug.log*
 yarn-debug.log*
