@@ -13,6 +13,12 @@ from ..utils.count.count import check_winner, generate_question
 router = Router()
 active_math_games = {} 
 
+def is_float(value):
+    try:
+        float(value)
+        return True
+    except ValueError:
+        return False
 
 @router.message(Command("start"))
 async def start_handler(message: Message, db: AsyncSession):
@@ -310,7 +316,7 @@ async def count_handler(message: types.Message, db: AsyncSession, bot: Bot):
 
     question = generate_question()
 
-    correct_res = question["Правильный ответ: "]
+    correct_res = float(question["Правильный ответ: "])
 
     game_data = {
         "partner_id": partner_tg_id,
@@ -337,8 +343,8 @@ async def count_handler(message: types.Message, db: AsyncSession, bot: Bot):
     u1_ans = game_data["answers"][user_id]
     u2_ans = game_data["answers"][partner_tg_id]
 
-    final_ans_u1 = u1_ans if u1_ans is not None else -99999
-    final_ans_u2 = u2_ans if u2_ans is not None else -99999
+    final_ans_u1 = u1_ans if u1_ans is not None else -99999.0
+    final_ans_u2 = u2_ans if u2_ans is not None else -99999.0
 
     winner_data = check_winner(
         correct_res,
@@ -380,7 +386,7 @@ async def forward_handler(message: Message, bot: Bot, db: AsyncSession):
     if not message.from_user:
         return
 
-    if (message.text or not message.text.isdigit()) and message.text.startswith("/"):
+    if (message.text or not is_float(message.text)) and message.text.startswith("/"):
         return
 
     service = ChatService(db)
@@ -390,8 +396,8 @@ async def forward_handler(message: Message, bot: Bot, db: AsyncSession):
     if user_id in active_math_games:
         text = message.text.strip()
 
-        if (text.isdigit() or (text.startswith("-") and text[1:].isdigit())) and active_math_games[user_id]["answers"][user_id] is None:
-            active_math_games[user_id]["answers"][user_id] = int(text)
+        if (is_float(text) or (text.startswith("-") and is_float(text[1:]))) and active_math_games[user_id]["answers"][user_id] is None:
+            active_math_games[user_id]["answers"][user_id] = float(text)
             await message.answer('Ответ принят!')
             return
 

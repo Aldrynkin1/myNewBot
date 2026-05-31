@@ -35,7 +35,7 @@ async def main(should_notify: bool):
     dp.update.middleware(DbSessionMiddleware())
     dp.include_router(router)
 
-    print("Bot started via Polling (Locally)!")
+    print("Bot started!")
     
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)
