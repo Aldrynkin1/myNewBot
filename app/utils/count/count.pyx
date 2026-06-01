@@ -18,7 +18,7 @@ cdef double count_res(int a, int b, char symbol):
     elif symbol == b'*'[0]:
         return a * b
     else:
-        return (<double>a / b) if b != 0 else 0.0
+        return (<double>a / b)
 
 cdef long long winner(double correct_res, User u1, User u2):
     cdef double answer1 = fabs(correct_res - u1.answer)

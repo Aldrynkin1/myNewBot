@@ -1,0 +1,3 @@
+import numpy as np
+
+def generate_fractal(w: int, h: int, max_iter: int, x_min: float, x_max: float, y_min: float, y_max: float) -> np.ndarray | None: ...

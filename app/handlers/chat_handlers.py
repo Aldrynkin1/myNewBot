@@ -1,17 +1,22 @@
+import time
 import asyncio
 from aiogram import Router, Bot, types, F
-from aiogram.types import Message
+from aiogram.types import Message, BufferedInputFile
 from aiogram.filters import Command
 from sqlalchemy.ext.asyncio import AsyncSession
+import logging
 
 from app.repositories.user_repo import UserRepository
 from app.services.matchmaking_service import MatchMakingService
 from app.services.chat_service import ChatService
 from app.utils.icebreaker import get_random_icebreaker
 from ..utils.count.count import check_winner, generate_question
+from app.fractals.create_fractal import get_beatiful_fractal
+
 
 router = Router()
 active_math_games = {} 
+logger = logging.getLogger(__name__)
 
 def is_float(value):
     try:
@@ -211,6 +216,7 @@ async def help_handler(message: Message):
         "/report — пожаловаться на собеседника\n"
         "/icebreaker — случайный вопрос для диалога\n"
         "/count - сыграть с партнером в интеллектуальную игру\n"
+        "/fractal - сделать свой собственный фрактал\n"
         "/help — показать это сообщение"
     )
 
@@ -380,6 +386,37 @@ async def count_handler(message: types.Message, db: AsyncSession, bot: Bot):
     else:
         result_for_partner += "Победил собеседник!"
     await bot.send_message(partner_tg_id, result_for_partner, parse_mode="Markdown")
+
+@router.message(Command('fractal'))
+async def send_fractal_handler(message: Message):
+
+    partner_tg_id = await ChatService.get_partner_id(
+        message.from_user.id,
+        message.from_user.username,
+        message.from_user.full_name
+    )
+
+    if not message.from_user:
+        return
+    
+    if not partner_tg_id:
+        await message.answer(
+            "Чтобы смотреть на прекрасное не нужен собеседник\n"
+        )
+    
+    logger.info(f"Пользователь {message.from_user.id} сделал запро сна фрактал")
+    await message.answer('Секунду, пожалуйста...')
+
+    try:
+        loop = asyncio.get_running_loop()
+        photo_bytes = await loop.run_in_executor(None, get_beatiful_fractal)
+
+        photo_file_to_send = BufferedInputFile(photo_bytes, filename='fractal.png')
+        await message.answer_photo(photo=photo_file_to_send, caption='Ваш уникальный фрактал')
+    except Exception as e:
+        logger.exception(f"Сбой при отправке фрактала юзеру {message.from_user.id}, {e}")
+        await message.answer("Извините, при генерации фрактала что-то пошло не так, попробуйте позже")
+
 
 @router.message(F.text, ~F.text.startswith("/"))
 async def forward_handler(message: Message, bot: Bot, db: AsyncSession):
