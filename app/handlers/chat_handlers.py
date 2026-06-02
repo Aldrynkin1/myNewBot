@@ -388,12 +388,14 @@ async def count_handler(message: types.Message, db: AsyncSession, bot: Bot):
     await bot.send_message(partner_tg_id, result_for_partner, parse_mode="Markdown")
 
 @router.message(Command('fractal'))
-async def send_fractal_handler(message: Message):
+async def send_fractal_handler(message: Message, db: AsyncSession):
 
-    partner_tg_id = await ChatService.get_partner_id(
+    chat_serv = ChatService(db)
+
+    partner_tg_id = await chat_serv.get_partner_id(
         message.from_user.id,
         message.from_user.username,
-        message.from_user.full_name
+        message.from_user.full_name,
     )
 
     if not message.from_user:
