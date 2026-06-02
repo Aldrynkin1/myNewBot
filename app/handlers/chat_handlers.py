@@ -389,22 +389,8 @@ async def count_handler(message: types.Message, db: AsyncSession, bot: Bot):
 
 @router.message(Command('fractal'))
 async def send_fractal_handler(message: Message, db: AsyncSession):
-
-    chat_serv = ChatService(db)
-
-    partner_tg_id = await chat_serv.get_partner_id(
-        message.from_user.id,
-        message.from_user.username,
-        message.from_user.full_name,
-    )
-
     if not message.from_user:
         return
-    
-    if not partner_tg_id:
-        await message.answer(
-            "Чтобы смотреть на прекрасное не нужен собеседник\n"
-        )
     
     logger.info(f"Пользователь {message.from_user.id} сделал запро сна фрактал")
     await message.answer('Секунду, пожалуйста...')
