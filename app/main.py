@@ -41,7 +41,7 @@ async def main(should_notify: bool):
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
-    user_input = input("Введите 'да', чтобы начать рассылку, или нажмите Enter, чтобы пропустить: ").strip().lower()
+    user_input = 'нет'
     run_notification = (user_input == 'да')
     
     asyncio.run(main(should_notify=run_notification))
