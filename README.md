@@ -37,6 +37,10 @@
 ```bash
 pip install -r requirements.txt
 python3 -m app.main
+
+Or
+
+docker-compose up --build
 ```
 
 ## Переменные окружения
